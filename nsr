@@ -1,0 +1,83 @@
+#!/usr/local/bin/perl
+# Copyright (c) 2013  Joerg Pernfuss <code.jpe@gmail.com>
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+# 1. Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+# OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+# HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+# LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+# OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+# SUCH DAMAGE.
+#
+# nsr - name service resolver
+#
+# Very simple name to ip resolver. Behaves similar to host(1), but since it
+# uses the regular system resolver(3), you can manipulate its results via
+# nsswitch.conf(5).
+#
+use strict;
+use 5.014_000;
+use feature qw/:5.14/;
+BEGIN {
+  use Socket qw/getaddrinfo getnameinfo NI_NUMERICHOST
+                SOCK_RAW AI_CANONNAME AF_INET AF_INET6/;
+  use constant {
+    EX_OK    => 0,
+    EX_ERROR => 1,
+    EX_USAGE => 64,
+  };
+}
+$0 = q/nsr/;
+my ( $name, $canon, $t_name, $t_alias ) = ( undef, undef, undef, undef );
+unless ( $ARGV[0] ) {
+  say STDERR "No hostname, no lookup.";
+  exit EX_USAGE;
+}
+$name = $ARGV[0];
+
+# use gethostbyname() since getaddrinfo() does not indicate if it followed
+# a CNAME
+( $t_name, $t_alias, undef, undef, undef ) = gethostbyname( $name );
+if (   ( $t_alias         )
+    && ( $name ne $t_name )) {
+  say "$t_alias is an alias for $t_name";
+  $name = $t_name;
+}
+
+my ( $err, @res ) = getaddrinfo( $name, "", { socktype => SOCK_RAW,
+                                              flags    => AI_CANONNAME } );
+if ( $err ) {
+  say STDERR "Host $name not found: NXDOMAIN";
+  exit EX_ERROR;
+}
+
+while (my $ai = shift @res) {
+  my ( $err, $ipaddr ) = getnameinfo( $ai->{addr}, NI_NUMERICHOST );
+
+  # first result should have canonname set, after which we are good.
+  # If things go shitfaced, fallback to $name
+  $canon = $ai->{canonname} if $ai->{canonname};
+  $canon = $canon // $name;
+
+  if ( $ai->{family} == AF_INET ) {
+    say "$canon has IPv4 address $ipaddr";
+  }
+  elsif ( $ai->{family} == AF_INET6 ) {
+    say "$canon has IPv6 address $ipaddr";
+  }
+}
+exit EX_OK;
