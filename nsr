@@ -61,7 +61,7 @@ if (   ( $t_alias         )
 my ( $err, @res ) = getaddrinfo( $name, "", { socktype => SOCK_RAW,
                                               flags    => AI_CANONNAME } );
 if ( $err ) {
-  say STDERR "Host $name not found: NXDOMAIN";
+  say STDERR "Host $name not found: NXDOMAIN/SERVFAIL";
   exit EX_ERROR;
 }
 
