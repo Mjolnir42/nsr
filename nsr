@@ -32,7 +32,7 @@
 use strict;
 use 5.014_000;
 use feature qw/:5.14/;
-use subs qw/reverse_ipv4 is_ipaddress/;
+use subs qw/reverse_ipv4 reverse_ipv6 is_ipaddress/;
 BEGIN {
   use Socket qw/getaddrinfo getnameinfo NI_NUMERICHOST
                 SOCK_RAW AI_CANONNAME AF_INET AF_INET6/;
@@ -79,7 +79,8 @@ while (my $ai = shift @res) {
         $tld = q'in-addr.arpa';
       }
       when ( AF_INET6 ) {
-        exit EX_USAGE;
+        $reverse = reverse_ipv6( $name );
+        $tld = q'ip6.arpa';
       }
     }
     if ( $name ne $ptr_name ) {
@@ -113,15 +114,73 @@ sub reverse_ipv4 {
   return join(q/./, reverse split(q/\./, $ip4addr));
 }
 
+sub reverse_ipv6 {
+  # convert IPv6 address into fully expanded notation,
+  # then reverse the order. This here only works for hexadecimal
+  # notation with colons, not every valid IPv6 format
+  my $ip6addr = shift;
+  my @groups = split(q/:/, $ip6addr);
+  my @expanded;
+
+  my $zeroblocks = 8 - scalar @groups;
+  my $i = 0;
+  if ( $ip6addr =~ /^::/ ) {
+    $zeroblocks += 2;
+  }
+  elsif ( $ip6addr =~ /::/ ) {
+    ++$zeroblocks;
+  }
+
+  foreach ( @groups ) {
+    unless ($_ eq "") {
+      push(@expanded, sprintf("%04s",lc($_))) and next;
+    }
+    for ($i; $i < $zeroblocks; $i++) {
+      push(@expanded, q'0000') and next;
+    }
+  }
+  for (my $j = scalar @expanded; $j < 8; $j++) {
+    push(@expanded, q'0000') and next;
+  }
+  my $reverse = join(q/./, reverse split(q//,join(q//,@expanded)));
+  return $reverse;
+}
+
 sub is_ipaddress {
   my $input = shift;
   # illegal characters
-  return FALSE unless ($input =~ m/^[0-9\.]+$/);
+  return FALSE unless ($input =~ m/^[0-9a-f:\.]+$/i);
 
   # test if IPv4 address
   my $re4p = q'(?:25[0-5]|2[0-4][0-9]|[01]?[0-9]{1,2})';
   my $re4 = qr/^$re4p\.$re4p\.$re4p\.$re4p$/;
   return TRUE if ($input =~ $re4);
 
+  # test if IPv6 address
+  # this only detects IPv6 addresses in hexadecimal format with
+  # colons, the probably most common usecase. Valid formats where
+  # the last 32-bit are written in "IPv4 notation" are not supported
+  return TRUE if ($input =~ m/^::$/);
+  my $short = FALSE;
+  if ($input =~ m/(?<!:)::$/) {
+    $input =~ s/::$//;
+    $short = TRUE;
+  }
+  elsif ($input =~ m/^::(?!:)/) {
+    $input =~ s/^:://;
+    $short = TRUE;
+  }
+  elsif ($input =~ m/(?<!:)::(?!:)/) {
+    $input =~ s/::/:/;
+    $short = TRUE;
+  }
+  # input had :: twice or :::
+  return FALSE if ($input =~ m/::/);
+
+  my $re6p = q'(?:[0-9a-f]{1,4})';
+  my $re6 = ($short == TRUE)
+          ? qr/^$re6p(?::$re6p){0,6}$/i
+          : qr/^$re6p(?::$re6p){7}$/i;
+  return TRUE if ($input =~ $re6);
   return FALSE;
 }
