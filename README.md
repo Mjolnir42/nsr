@@ -58,24 +58,27 @@ foobar.localdomain.example has IPv4 address 203.0.113.254
 254.113.0.203.in-addr.arpa domain name pointer foobar.localdomain.example
 
 ~% nsr 2001:db8:0:1::254
-4.5.2.0.0.0.0.0.0.0.0.0.0.0.0.0.1.0.0.0.0.0.0.0.8.b.d.0.1.0.0.2.ip6.arpa domain name pointer foobar.localdomain.example
+4.5.2.0.0.0.0.0.0.0.0.0.0.0.0.0.1.0.0.0.0.0.0.0.8.b.d.0.1.0.0.2.ip6.arpa \
+domain name pointer foobar.localdomain.example
 ```
 
 Installation
 ============
 
 Just copy it somewhere in your `$PATH`. `$HOME/bin` might work for you.
+Also remember `+x` etc.
 
 Dependencies
 ============
 
 `nsr` is written in Perl and requires version 5.14.0, in which
-`getaddrinfo()` and `getnameinfo()` were added to core. If you have an
-older version of Perl, get `Socket::GetAddrInfo` from CPAN.
+`getaddrinfo()` and `getnameinfo()` were added to Core.
+If you have an older version of Perl, get `Socket::GetAddrInfo`
+from CPAN and adapt the code.
 
 Known Features
 ==============
-* `nsr` does not detect if you replace a series of IPv6 `0000` blocks
-  with `::` that is not the longest block. It will instead give you
+* `nsr` does not detect if you replace a series of IPv6 zero blocks
+  with `::` that is not the longest series. It will instead give you
   funny results
-* `nsr` does not support all valid `IPv6` notations known to man
+* `nsr` does not support all valid IPv6 address notations known to man
