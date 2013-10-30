@@ -1,4 +1,4 @@
-#!/usr/local/bin/perl
+#!/usr/bin/perl
 # Copyright (c) 2013  Joerg Pernfuss <code.jpe@gmail.com>
 # All rights reserved.
 #
@@ -32,6 +32,7 @@
 use strict;
 use 5.014_000;
 use feature qw/:5.14/;
+use subs qw/reverse_ipv4 is_ipaddress/;
 BEGIN {
   use Socket qw/getaddrinfo getnameinfo NI_NUMERICHOST
                 SOCK_RAW AI_CANONNAME AF_INET AF_INET6/;
@@ -39,6 +40,8 @@ BEGIN {
     EX_OK    => 0,
     EX_ERROR => 1,
     EX_USAGE => 64,
+    TRUE     => 1,
+    FALSE    => 0,
   };
 }
 $0 = q/nsr/;
@@ -48,6 +51,7 @@ unless ( $ARGV[0] ) {
   exit EX_USAGE;
 }
 $name = $ARGV[0];
+my $is_ipaddress = is_ipaddress( $name );
 
 # use gethostbyname() since getaddrinfo() does not indicate if it followed
 # a CNAME
@@ -66,18 +70,58 @@ if ( $err ) {
 }
 
 while (my $ai = shift @res) {
-  my ( $err, $ipaddr ) = getnameinfo( $ai->{addr}, NI_NUMERICHOST );
-
-  # first result should have canonname set, after which we are good.
-  # If things go shitfaced, fallback to $name
-  $canon = $ai->{canonname} if $ai->{canonname};
-  $canon = $canon // $name;
-
-  if ( $ai->{family} == AF_INET ) {
-    say "$canon has IPv4 address $ipaddr";
+  if ( $is_ipaddress) {
+    my ( $reverse, $tld ) = ( undef, undef );
+    my ( $err, $ptr_name ) = getnameinfo( $ai->{addr} );
+    given( $ai->{family}) {
+      when ( AF_INET ) {
+        $reverse = reverse_ipv4( $name );
+        $tld = q'in-addr.arpa';
+      }
+      when ( AF_INET6 ) {
+        exit EX_USAGE;
+      }
+    }
+    if ( $name ne $ptr_name ) {
+      say "$reverse.$tld domain name pointer $ptr_name";
+    }
+    else {
+      say "Host $reverse.$tld not found: NXDOMAIN/SERVFAIL";
+      exit EX_ERROR;
+    }
   }
-  elsif ( $ai->{family} == AF_INET6 ) {
-    say "$canon has IPv6 address $ipaddr";
+  else {
+    my ( $err, $ipaddr ) = getnameinfo( $ai->{addr}, NI_NUMERICHOST );
+
+    # first result should have canonname set, after which we are good.
+    # If things go shitfaced, fallback to $name
+    $canon = $ai->{canonname} if $ai->{canonname};
+    $canon = $canon // $name;
+
+    if ( $ai->{family} == AF_INET ) {
+      say "$canon has IPv4 address $ipaddr";
+    }
+    elsif ( $ai->{family} == AF_INET6 ) {
+      say "$canon has IPv6 address $ipaddr";
+    }
   }
 }
 exit EX_OK;
+
+sub reverse_ipv4 {
+  my $ip4addr = shift;
+  return join(q/./, reverse split(q/\./, $ip4addr));
+}
+
+sub is_ipaddress {
+  my $input = shift;
+  # illegal characters
+  return FALSE unless ($input =~ m/^[0-9\.]+$/);
+
+  # test if IPv4 address
+  my $re4p = q'(?:25[0-5]|2[0-4][0-9]|[01]?[0-9]{1,2})';
+  my $re4 = qr/^$re4p\.$re4p\.$re4p\.$re4p$/;
+  return TRUE if ($input =~ $re4);
+
+  return FALSE;
+}
