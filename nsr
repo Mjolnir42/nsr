@@ -32,10 +32,10 @@
 use strict;
 use 5.014_000;
 use feature qw/:5.14/;
-use subs qw/reverse_ipv4 reverse_ipv6 is_ipaddress/;
 BEGIN {
   use Socket qw/getaddrinfo getnameinfo NI_NUMERICHOST
                 SOCK_RAW AI_CANONNAME AF_INET AF_INET6/;
+  use subs qw/reverse_ipv4 reverse_ipv6 is_ipaddress/;
   use constant {
     EX_OK    => 0,
     EX_ERROR => 1,
@@ -51,10 +51,10 @@ unless ( $ARGV[0] ) {
   exit EX_USAGE;
 }
 $name = $ARGV[0];
-my $is_ipaddress = is_ipaddress( $name );
+my $is_ipaddress = is_ipaddress ( $name );
 
-# use gethostbyname() since getaddrinfo() does not indicate if it followed
-# a CNAME
+# use gethostbyname() since getaddrinfo() does not indicate if it
+# followed a CNAME. If we followed a CNAME, update the host to query
 ( $t_name, $t_alias, undef, undef, undef ) = gethostbyname( $name );
 if (   ( $t_alias         )
     && ( $name ne $t_name )) {
@@ -62,25 +62,29 @@ if (   ( $t_alias         )
   $name = $t_name;
 }
 
-my ( $err, @res ) = getaddrinfo( $name, "", { socktype => SOCK_RAW,
-                                              flags    => AI_CANONNAME } );
+my ( $err, @res ) = getaddrinfo ( $name, "", { socktype => SOCK_RAW,
+                                               flags    => AI_CANONNAME } );
 if ( $err ) {
   say STDERR "Host $name not found: NXDOMAIN/SERVFAIL";
   exit EX_ERROR;
 }
 
-while (my $ai = shift @res) {
-  if ( $is_ipaddress) {
+while ( my $ai = shift @res ) {
+  if ( $is_ipaddress ) {
     my ( $reverse, $tld ) = ( undef, undef );
-    my ( $err, $ptr_name ) = getnameinfo( $ai->{addr} );
-    given( $ai->{family}) {
+    my ( $err, $ptr_name ) = getnameinfo ( $ai->{addr} );
+    given ( $ai->{family} ) {
       when ( AF_INET ) {
         $reverse = reverse_ipv4( $name );
-        $tld = q'in-addr.arpa';
+        $tld = q/in-addr.arpa/;
       }
       when ( AF_INET6 ) {
         $reverse = reverse_ipv6( $name );
-        $tld = q'ip6.arpa';
+        $tld = q/ip6.arpa/;
+      }
+      default {
+        say STDERR "Unrecognized IP protocol version.";
+        exit EX_ERROR;
       }
     }
     if ( $name ne $ptr_name ) {
@@ -92,26 +96,34 @@ while (my $ai = shift @res) {
     }
   }
   else {
-    my ( $err, $ipaddr ) = getnameinfo( $ai->{addr}, NI_NUMERICHOST );
+    my ( $family ) = ( undef );
+    my ( $err, $ipaddr ) = getnameinfo ( $ai->{addr}, NI_NUMERICHOST );
 
     # first result should have canonname set, after which we are good.
     # If things go shitfaced, fallback to $name
     $canon = $ai->{canonname} if $ai->{canonname};
     $canon = $canon // $name;
 
-    if ( $ai->{family} == AF_INET ) {
-      say "$canon has IPv4 address $ipaddr";
+    given ( $ai->{family} ) {
+      when ( AF_INET ) {
+        $family = q/IPv4/;
+      }
+      when ( AF_INET6 ) {
+        $family = q/IPv6/;
+      }
+      default {
+        say STDERR "Unrecognized IP protocol version.";
+        exit EX_ERROR;
+      }
     }
-    elsif ( $ai->{family} == AF_INET6 ) {
-      say "$canon has IPv6 address $ipaddr";
-    }
+    say "$canon has $family address $ipaddr";
   }
 }
 exit EX_OK;
 
 sub reverse_ipv4 {
   my $ip4addr = shift;
-  return join(q/./, reverse split(q/\./, $ip4addr));
+  return join ( q/./, reverse split ( q/\./, $ip4addr ) );
 }
 
 sub reverse_ipv6 {
@@ -119,7 +131,7 @@ sub reverse_ipv6 {
   # then reverse the order. This here only works for hexadecimal
   # notation with colons, not every valid IPv6 format
   my $ip6addr = shift;
-  my @groups = split(q/:/, $ip6addr);
+  my @groups = split ( q/:/, $ip6addr );
   my @expanded;
 
   my $zeroblocks = 8 - scalar @groups;
@@ -132,45 +144,44 @@ sub reverse_ipv6 {
   }
 
   foreach ( @groups ) {
-    unless ($_ eq "") {
-      push(@expanded, sprintf("%04s",lc($_))) and next;
+    unless ( $_ eq "" ) {
+      push ( @expanded, sprintf ( "%04s", lc ( $_ ) ) ) and next;
     }
-    for ($i; $i < $zeroblocks; $i++) {
-      push(@expanded, q'0000') and next;
+    for ( $i; $i < $zeroblocks; $i++ ) {
+      push ( @expanded, q/0000/ ) and next;
     }
   }
-  for (my $j = scalar @expanded; $j < 8; $j++) {
-    push(@expanded, q'0000') and next;
+  for ( my $j = scalar @expanded; $j < 8; $j++ ) {
+    push ( @expanded, q/0000/ ) and next;
   }
-  my $reverse = join(q/./, reverse split(q//,join(q//,@expanded)));
-  return $reverse;
+  return join ( q/./, reverse split ( q//, join ( q//, @expanded ) ) );
 }
 
 sub is_ipaddress {
   my $input = shift;
   # illegal characters
-  return FALSE unless ($input =~ m/^[0-9a-f:\.]+$/i);
+  return FALSE unless ( $input =~ m/^[0-9a-f:\.]+$/i );
 
   # test if IPv4 address
   my $re4p = q'(?:25[0-5]|2[0-4][0-9]|[01]?[0-9]{1,2})';
   my $re4 = qr/^$re4p\.$re4p\.$re4p\.$re4p$/;
-  return TRUE if ($input =~ $re4);
+  return TRUE if ( $input =~ $re4 );
 
   # test if IPv6 address
   # this only detects IPv6 addresses in hexadecimal format with
   # colons, the probably most common usecase. Valid formats where
   # the last 32-bit are written in "IPv4 notation" are not supported
-  return TRUE if ($input =~ m/^::$/);
+  return TRUE if ( $input =~ m/^::$/ );
   my $short = FALSE;
-  if ($input =~ m/(?<!:)::$/) {
+  if ( $input =~ m/(?<!:)::$/ ) {
     $input =~ s/::$//;
     $short = TRUE;
   }
-  elsif ($input =~ m/^::(?!:)/) {
+  elsif ( $input =~ m/^::(?!:)/ ) {
     $input =~ s/^:://;
     $short = TRUE;
   }
-  elsif ($input =~ m/(?<!:)::(?!:)/) {
+  elsif ( $input =~ m/(?<!:)::(?!:)/ ) {
     $input =~ s/::/:/;
     $short = TRUE;
   }
@@ -178,9 +189,9 @@ sub is_ipaddress {
   return FALSE if ($input =~ m/::/);
 
   my $re6p = q'(?:[0-9a-f]{1,4})';
-  my $re6 = ($short == TRUE)
+  my $re6 = ( $short == TRUE )
           ? qr/^$re6p(?::$re6p){0,6}$/i
           : qr/^$re6p(?::$re6p){7}$/i;
-  return TRUE if ($input =~ $re6);
+  return TRUE if ( $input =~ $re6 );
   return FALSE;
 }
