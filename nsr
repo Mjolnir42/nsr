@@ -54,7 +54,8 @@ $name = $ARGV[0];
 my $is_ipaddress = is_ipaddress ( $name );
 
 # use gethostbyname() since getaddrinfo() does not indicate if it
-# followed a CNAME. If we followed a CNAME, update the host to query
+# followed a CNAME. If we followed a CNAME, update what we actually
+# query
 ( $t_name, $t_alias, undef, undef, undef ) = gethostbyname( $name );
 if (   ( $t_alias         )
     && ( $name ne $t_name )) {
@@ -88,7 +89,7 @@ while ( my $ai = shift @res ) {
       }
     }
     if ( $name ne $ptr_name ) {
-      say "$reverse.$tld domain name pointer $ptr_name";
+      say "$reverse.$tld domain name pointer $ptr_name.";
     }
     else {
       say "Host $reverse.$tld not found: NXDOMAIN/SERVFAIL";
@@ -134,6 +135,9 @@ sub reverse_ipv6 {
   my @groups = split ( q/:/, $ip6addr );
   my @expanded;
 
+  # Account for the various number of empty entries in @groups
+  # depending on where in the address the :: was.
+  # Hic sunt dracones.
   my $zeroblocks = 8 - scalar @groups;
   my $i = 0;
   if ( $ip6addr =~ /^::/ ) {
@@ -151,6 +155,7 @@ sub reverse_ipv6 {
       push ( @expanded, q/0000/ ) and next;
     }
   }
+  # fill trailing zero blocks if the address ended in :: or is ::
   for ( my $j = scalar @expanded; $j < 8; $j++ ) {
     push ( @expanded, q/0000/ ) and next;
   }
@@ -159,12 +164,12 @@ sub reverse_ipv6 {
 
 sub is_ipaddress {
   my $input = shift;
-  # illegal characters
+  # contains illegal characters
   return FALSE unless ( $input =~ m/^[0-9a-f:\.]+$/i );
 
   # test if IPv4 address
   my $re4p = q'(?:25[0-5]|2[0-4][0-9]|[01]?[0-9]{1,2})';
-  my $re4 = qr/^$re4p\.$re4p\.$re4p\.$re4p$/;
+  my $re4 = qr/^$re4p(?:\.$re4p){3}$/;
   return TRUE if ( $input =~ $re4 );
 
   # test if IPv6 address
@@ -173,15 +178,15 @@ sub is_ipaddress {
   # the last 32-bit are written in "IPv4 notation" are not supported
   return TRUE if ( $input =~ m/^::$/ );
   my $short = FALSE;
-  if ( $input =~ m/(?<!:)::$/ ) {
+  if ( $input =~ m/(?<!:)::$/ ) { # look-behind
     $input =~ s/::$//;
     $short = TRUE;
   }
-  elsif ( $input =~ m/^::(?!:)/ ) {
+  elsif ( $input =~ m/^::(?!:)/ ) { # look-ahead
     $input =~ s/^:://;
     $short = TRUE;
   }
-  elsif ( $input =~ m/(?<!:)::(?!:)/ ) {
+  elsif ( $input =~ m/(?<!:)::(?!:)/ ) { # look-around
     $input =~ s/::/:/;
     $short = TRUE;
   }
@@ -193,5 +198,7 @@ sub is_ipaddress {
           ? qr/^$re6p(?::$re6p){0,6}$/i
           : qr/^$re6p(?::$re6p){7}$/i;
   return TRUE if ( $input =~ $re6 );
+  # did not conform to our narrow view of what an IPv4 or IPv6
+  # address looks like -- might still be one!
   return FALSE;
 }
