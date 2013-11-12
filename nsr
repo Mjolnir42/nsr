@@ -59,7 +59,11 @@ my $is_ipaddress = is_ipaddress ( $name );
 ( $t_name, $t_alias, undef, undef, undef ) = gethostbyname( $name );
 if (   ( $t_alias         )
     && ( $name ne $t_name )) {
-  say "$t_alias is an alias for $t_name";
+  my @aliases = split( q/ /, $t_alias );
+  push( @aliases, $t_name );
+  for ( my $i = 0; $i < scalar @aliases -1; $i++ ) {
+    say "$aliases[$i] is an alias for $aliases[$i+1].";
+  }
   $name = $t_name;
 }
 
