@@ -48,7 +48,7 @@ BEGIN {
 local $0 = q/nsr/;
 my ( $name, $canon, $t_name, $t_alias ) = ( undef, undef, undef, undef );
 unless ( $ARGV[0] ) {
-  say STDERR "No hostname, no lookup.";
+  warn qq{No hostname, no lookup.\n};
   exit EX_USAGE;
 }
 $name = $ARGV[0];
@@ -71,7 +71,7 @@ if (   ( $t_alias         )
 my ( $err, @res ) = getaddrinfo ( $name, "", { socktype => SOCK_RAW,
                                                flags    => AI_CANONNAME } );
 if ( $err ) {
-  say STDERR "Host $name not found: NXDOMAIN/SERVFAIL";
+  warn qq{Host $name not found: NXDOMAIN/SERVFAIL\n};
   exit EX_ERROR;
 }
 
@@ -89,7 +89,7 @@ while ( my $ai = shift @res ) {
         $tld = q/ip6.arpa/;
       }
       default {
-        say STDERR "Unrecognized IP protocol version.";
+        warn qq{Unrecognized IP protocol version.\n};
         exit EX_ERROR;
       }
     }
@@ -97,7 +97,7 @@ while ( my $ai = shift @res ) {
       say "$reverse.$tld domain name pointer $ptr_name.";
     }
     else {
-      say "Host $reverse.$tld not found: NXDOMAIN/SERVFAIL";
+      warn qq{Host $reverse.$tld not found: NXDOMAIN/SERVFAIL\n};
       exit EX_ERROR;
     }
   }
@@ -118,7 +118,7 @@ while ( my $ai = shift @res ) {
         $family = q/IPv6/;
       }
       default {
-        say STDERR "Unrecognized IP protocol version.";
+        warn qq{Unrecognized IP protocol version.\n};
         exit EX_ERROR;
       }
     }
