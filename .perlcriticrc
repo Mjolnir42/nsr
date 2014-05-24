@@ -1,12 +1,18 @@
 severity = harsh
 verbose  = 10
 
-# None of the improvements of the readonly module
-# over the constant pragma apply to this use
-exclude  = ProhibitConstantPragma 
+# * None of the improvements of the readonly module
+#   over the constant pragma apply to this use
+# * perl5i::2 removes the requirement for the trailing
+#   true in modules.
+exclude = ValuesAndExpressions::ProhibitConstantPragma Modules::RequireEndWithOne
 
 [Variables::ProhibitReusedNames]
 # this code will not get improved readability by
 # inventing an unique error flag for every lexical
 # scope. sorry.
 allow = $self $class $err
+
+[TestingAndDebugging::RequireUseWarnings]
+# perl5i::2 includes Modern::Perl which enabled strict and warnings
+equivalent_modules = perl5i::2

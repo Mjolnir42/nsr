@@ -1,5 +1,5 @@
 #!/usr/bin/perl
-# Copyright (c) 2013  Joerg Pernfuss <code.jpe@gmail.com>
+# Copyright (c) 2013-2014  Joerg Pernfuss <code.jpe@gmail.com>
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -29,14 +29,12 @@
 # uses the regular system resolver(3), you can manipulate its results via
 # nsswitch.conf(5).
 #
-use strict;
-use warnings;
 use 5.014_000;
-use feature qw/:5.14/;
+use perl5i::2;
 BEGIN {
   use Socket qw/getaddrinfo getnameinfo NI_NUMERICHOST
                 SOCK_RAW AI_CANONNAME AF_INET AF_INET6/;
-  use subs qw/reverse_ipv4 reverse_ipv6 is_ipaddress/;
+  use Nsr::Util qw/reverse_ipv4 reverse_ipv6 is_ipaddress/;
   use constant {
     EX_OK    => 0,
     EX_ERROR => 1,
@@ -60,8 +58,8 @@ my $is_ipaddress = is_ipaddress ( $name );
 ( $t_name, $t_alias, undef, undef, undef ) = gethostbyname( $name );
 if (   ( $t_alias         )
     && ( $name ne $t_name )) {
-  my @aliases = split( q/ /, $t_alias );
-  push( @aliases, $t_name );
+  my @aliases = $t_alias->split( q/ / );
+  @aliases->push( $t_name );
   for ( my $i = 0; $i < scalar @aliases -1; $i++ ) {
     say "$aliases[$i] is an alias for $aliases[$i+1].";
   }
@@ -75,7 +73,7 @@ if ( $err ) {
   exit EX_ERROR;
 }
 
-while ( my $ai = shift @res ) {
+while ( my $ai = @res->shift ) {
   if ( $is_ipaddress ) {
     my ( $reverse, $tld ) = ( undef, undef );
     my ( $err, $ptr_name ) = getnameinfo ( $ai->{addr} );
@@ -93,6 +91,7 @@ while ( my $ai = shift @res ) {
         exit EX_ERROR;
       }
     }
+    # we get our question as result if nothing was found
     if ( $name ne $ptr_name ) {
       say "$reverse.$tld domain name pointer $ptr_name.";
     }
@@ -126,85 +125,3 @@ while ( my $ai = shift @res ) {
   }
 }
 exit EX_OK;
-
-sub reverse_ipv4 {
-  my $ip4addr = shift;
-  return join ( q/./, reverse split ( q/\./, $ip4addr ) );
-}
-
-sub reverse_ipv6 {
-  # convert IPv6 address into fully expanded notation,
-  # then reverse the order. This here only works for hexadecimal
-  # notation with colons, not every valid IPv6 format
-  my $ip6addr = shift;
-  my @groups = split ( q/:/, $ip6addr );
-  my @expanded;
-
-  # Account for the various number of empty entries in @groups
-  # depending on where in the address the :: was.
-  # Hic sunt dracones.
-  my $zeroblocks = 8 - scalar @groups;
-  my $i = 0;
-  if ( $ip6addr =~ /^::/x ) {
-    $zeroblocks += 2;
-  }
-  elsif ( $ip6addr =~ /::/x ) {
-    ++$zeroblocks;
-  }
-
-  foreach ( @groups ) {
-    unless ( $_ eq "" ) {
-      push ( @expanded, sprintf ( "%04s", lc ( $_ ) ) ) and next;
-    }
-    while ( $i < $zeroblocks ) {
-      push ( @expanded, q/0000/ );
-      ++$i;
-    }
-  }
-  # fill trailing zero blocks if the address ended in :: or is ::
-  for ( my $j = scalar @expanded; $j < 8; $j++ ) {
-    push ( @expanded, q/0000/ ) and next;
-  }
-  return join ( q/./, reverse split ( q//, join ( q//, @expanded ) ) );
-}
-
-sub is_ipaddress {
-  my $input = shift;
-  # contains illegal characters
-  return FALSE unless ( $input =~ m/^[0-9a-f:\.]+$/ix );
-
-  # test if IPv4 address
-  my $re4p = q/(?:25[0-5]|2[0-4][0-9]|[01]?[0-9]{1,2})/;
-  my $re4 = qr/^$re4p(?:\.$re4p){3}$/x;
-  return TRUE if ( $input =~ $re4 );
-
-  # test if IPv6 address
-  # this only detects IPv6 addresses in hexadecimal format with
-  # colons, the probably most common usecase. Valid formats where
-  # the last 32-bit are written in "IPv4 notation" are not supported
-  return TRUE if ( $input =~ m/^::$/x );
-  my $short = FALSE;
-  if ( $input =~ m/(?<!:)::$/x ) { # look-behind
-    $input =~ s/::$//x;
-    $short = TRUE;
-  }
-  elsif ( $input =~ m/^::(?!:)/x ) { # look-ahead
-    $input =~ s/^:://x;
-    $short = TRUE;
-  }
-  elsif ( $input =~ m/(?<!:)::(?!:)/x ) { # look-around
-    $input =~ s/::/:/x;
-    $short = TRUE;
-  }
-  # input had :: twice or :::
-  return FALSE if ($input =~ m/::/x);
-
-  my $re6p = q/(?:[0-9a-f]{1,4})/;
-  my $re6 = ( $short == TRUE )
-          ? qr/^$re6p(?::$re6p){0,6}$/ix
-          : qr/^$re6p(?::$re6p){7}$/ix;
-  return TRUE if ( $input =~ $re6 );
-  # did not conform to our narrow view of what an IPv4 or IPv6
-  # address looks like -- might still be one!
-  return FALSE;
-}
