@@ -30,6 +30,7 @@
 # nsswitch.conf(5).
 #
 use strict;
+use warnings;
 use 5.014_000;
 use feature qw/:5.14/;
 BEGIN {
@@ -44,7 +45,7 @@ BEGIN {
     FALSE    => 0,
   };
 }
-$0 = q/nsr/;
+local $0 = q/nsr/;
 my ( $name, $canon, $t_name, $t_alias ) = ( undef, undef, undef, undef );
 unless ( $ARGV[0] ) {
   say STDERR "No hostname, no lookup.";
