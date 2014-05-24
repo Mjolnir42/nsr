@@ -156,8 +156,9 @@ sub reverse_ipv6 {
     unless ( $_ eq "" ) {
       push ( @expanded, sprintf ( "%04s", lc ( $_ ) ) ) and next;
     }
-    for ( $i; $i < $zeroblocks; $i++ ) {
-      push ( @expanded, q/0000/ ) and next;
+    while ($i < $zeroblocks) {
+      push ( @expanded, q/0000/ );
+      ++$i;
     }
   }
   # fill trailing zero blocks if the address ended in :: or is ::
