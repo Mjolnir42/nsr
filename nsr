@@ -156,7 +156,7 @@ sub reverse_ipv6 {
     unless ( $_ eq "" ) {
       push ( @expanded, sprintf ( "%04s", lc ( $_ ) ) ) and next;
     }
-    while ($i < $zeroblocks) {
+    while ( $i < $zeroblocks ) {
       push ( @expanded, q/0000/ );
       ++$i;
     }
