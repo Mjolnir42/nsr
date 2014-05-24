@@ -145,10 +145,10 @@ sub reverse_ipv6 {
   # Hic sunt dracones.
   my $zeroblocks = 8 - scalar @groups;
   my $i = 0;
-  if ( $ip6addr =~ /^::/ ) {
+  if ( $ip6addr =~ /^::/x ) {
     $zeroblocks += 2;
   }
-  elsif ( $ip6addr =~ /::/ ) {
+  elsif ( $ip6addr =~ /::/x ) {
     ++$zeroblocks;
   }
 
@@ -170,38 +170,38 @@ sub reverse_ipv6 {
 sub is_ipaddress {
   my $input = shift;
   # contains illegal characters
-  return FALSE unless ( $input =~ m/^[0-9a-f:\.]+$/i );
+  return FALSE unless ( $input =~ m/^[0-9a-f:\.]+$/ix );
 
   # test if IPv4 address
   my $re4p = q'(?:25[0-5]|2[0-4][0-9]|[01]?[0-9]{1,2})';
-  my $re4 = qr/^$re4p(?:\.$re4p){3}$/;
+  my $re4 = qr/^$re4p(?:\.$re4p){3}$/x;
   return TRUE if ( $input =~ $re4 );
 
   # test if IPv6 address
   # this only detects IPv6 addresses in hexadecimal format with
   # colons, the probably most common usecase. Valid formats where
   # the last 32-bit are written in "IPv4 notation" are not supported
-  return TRUE if ( $input =~ m/^::$/ );
+  return TRUE if ( $input =~ m/^::$/x );
   my $short = FALSE;
-  if ( $input =~ m/(?<!:)::$/ ) { # look-behind
-    $input =~ s/::$//;
+  if ( $input =~ m/(?<!:)::$/x ) { # look-behind
+    $input =~ s/::$//x;
     $short = TRUE;
   }
-  elsif ( $input =~ m/^::(?!:)/ ) { # look-ahead
-    $input =~ s/^:://;
+  elsif ( $input =~ m/^::(?!:)/x ) { # look-ahead
+    $input =~ s/^:://x;
     $short = TRUE;
   }
-  elsif ( $input =~ m/(?<!:)::(?!:)/ ) { # look-around
-    $input =~ s/::/:/;
+  elsif ( $input =~ m/(?<!:)::(?!:)/x ) { # look-around
+    $input =~ s/::/:/x;
     $short = TRUE;
   }
   # input had :: twice or :::
-  return FALSE if ($input =~ m/::/);
+  return FALSE if ($input =~ m/::/x);
 
   my $re6p = q'(?:[0-9a-f]{1,4})';
   my $re6 = ( $short == TRUE )
-          ? qr/^$re6p(?::$re6p){0,6}$/i
-          : qr/^$re6p(?::$re6p){7}$/i;
+          ? qr/^$re6p(?::$re6p){0,6}$/ix
+          : qr/^$re6p(?::$re6p){7}$/ix;
   return TRUE if ( $input =~ $re6 );
   # did not conform to our narrow view of what an IPv4 or IPv6
   # address looks like -- might still be one!
