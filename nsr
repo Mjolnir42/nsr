@@ -173,7 +173,7 @@ sub is_ipaddress {
   return FALSE unless ( $input =~ m/^[0-9a-f:\.]+$/ix );
 
   # test if IPv4 address
-  my $re4p = q'(?:25[0-5]|2[0-4][0-9]|[01]?[0-9]{1,2})';
+  my $re4p = q/(?:25[0-5]|2[0-4][0-9]|[01]?[0-9]{1,2})/;
   my $re4 = qr/^$re4p(?:\.$re4p){3}$/x;
   return TRUE if ( $input =~ $re4 );
 
@@ -198,7 +198,7 @@ sub is_ipaddress {
   # input had :: twice or :::
   return FALSE if ($input =~ m/::/x);
 
-  my $re6p = q'(?:[0-9a-f]{1,4})';
+  my $re6p = q/(?:[0-9a-f]{1,4})/;
   my $re6 = ( $short == TRUE )
           ? qr/^$re6p(?::$re6p){0,6}$/ix
           : qr/^$re6p(?::$re6p){7}$/ix;
