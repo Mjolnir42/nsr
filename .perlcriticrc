@@ -1,0 +1,12 @@
+severity = harsh
+verbose  = 10
+
+# None of the improvements of the readonly module
+# over the constant pragma apply to this use
+exclude  = ProhibitConstantPragma 
+
+[Variables::ProhibitReusedNames]
+# this code will not get improved readability by
+# inventing an unique error flag for every lexical
+# scope. sorry.
+allow = $self $class $err
