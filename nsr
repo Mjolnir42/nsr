@@ -32,7 +32,6 @@
 use strict;
 use warnings;
 use 5.014_000;
-use feature qw/:5.14/;
 BEGIN {
   use Socket qw/getaddrinfo getnameinfo NI_NUMERICHOST
                 SOCK_RAW AI_CANONNAME AF_INET AF_INET6/;
